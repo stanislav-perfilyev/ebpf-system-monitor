@@ -59,9 +59,11 @@ TEST(PrometheusMetrics, CounterIncrementsAfterRecord) {
     inet_pton(AF_INET, "10.0.0.1", &src);
     inet_pton(AF_INET, "8.8.8.8",  &dst);
 
-    auto ev = make_event(1234, "curl", src, dst, htons(54321), htons(443),
-                          TCP_ACTION_CONNECT, 512, 1024);
-    reporter.record(ev);
+    // Real workflow: CONNECT establishes connection, CLOSE carries byte counts
+    reporter.record(make_event(1234, "curl", src, dst, htons(54321), htons(443),
+                               TCP_ACTION_CONNECT, 0, 0));
+    reporter.record(make_event(1234, "curl", src, dst, htons(54321), htons(443),
+                               TCP_ACTION_CLOSE, 512, 1024));
 
     const auto out = http::PrometheusMetrics::from_reporter(reporter);
 
@@ -69,7 +71,7 @@ TEST(PrometheusMetrics, CounterIncrementsAfterRecord) {
     EXPECT_NE(out.find("ebpf_active_connections 1"), std::string::npos);
     // Should contain comm label
     EXPECT_NE(out.find("comm=\"curl\""), std::string::npos);
-    // Should contain byte counters
+    // Should contain byte counters in per-connection lines
     EXPECT_NE(out.find("512"), std::string::npos);
     EXPECT_NE(out.find("1024"), std::string::npos);
 }
