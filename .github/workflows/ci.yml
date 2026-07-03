@@ -45,9 +45,12 @@ jobs:
         run: cmake --build build --target bpf_programs -j$(nproc)
 
       - name: Build tests
-        run: cmake --build build --target test_ebpf_monitor -j$(nproc)
+        run: |
+          cmake --build build --target test_ebpf_monitor -j$(nproc)
+          cmake --build build --target test_dpdk_sim     -j$(nproc)
+          cmake --build build --target test_http         -j$(nproc)
 
       - name: Run unit tests
         run: |
           cd build
-          ctest --output-on-failure -R "StatsReporter|CommonStructs"
+          ctest --output-on-failure

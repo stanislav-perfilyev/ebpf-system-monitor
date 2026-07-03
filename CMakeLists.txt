@@ -82,6 +82,8 @@ add_executable(ebpf-monitor
 target_include_directories(ebpf-monitor PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/dpdk_sim
+    ${CMAKE_SOURCE_DIR}/src/http
     ${LIBBPF_INCLUDE}
 )
 

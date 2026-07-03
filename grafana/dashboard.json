@@ -1,0 +1,111 @@
+{
+  "title": "eBPF System Monitor",
+  "uid":   "ebpf-monitor-v1",
+  "version": 1,
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": { "from": "now-5m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Active Connections",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "ebpf_active_connections",
+          "legendFormat": "connections"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "TX / RX bytes",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "rate(ebpf_connection_bytes_tx_total[30s])",
+          "legendFormat": "TX bytes/s"
+        },
+        {
+          "expr": "rate(ebpf_connection_bytes_rx_total[30s])",
+          "legendFormat": "RX bytes/s"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "New Connections / s",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "rate(ebpf_connection_connects_total[30s])",
+          "legendFormat": "connects/s"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "DPDK Sim — Packets Processed",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(dpdk_sim_packets_processed_total[30s])",
+          "legendFormat": "pps"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "DPDK Sim — Pool Available",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "dpdk_sim_pool_available",
+          "legendFormat": "free slots"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "steps": [
+            { "color": "red",    "value": 0   },
+            { "color": "yellow", "value": 64  },
+            { "color": "green",  "value": 256 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Packets Dropped",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(dpdk_sim_packets_dropped_total[30s])",
+          "legendFormat": "drops/s"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "steps": [
+            { "color": "green",  "value": 0  },
+            { "color": "yellow", "value": 1  },
+            { "color": "red",    "value": 10 }
+          ]
+        }
+      }
+    }
+  ]
+}

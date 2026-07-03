@@ -129,6 +129,16 @@ public:
         stats_.clear();
     }
 
+    /// Iterate over all connections (thread-safe snapshot).
+    /// Callback: void(const ConnectionKey&, const ConnectionStats&)
+    template <typename Fn>
+    void for_each(Fn&& fn) const
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        for (const auto& [key, st] : stats_)
+            fn(key, st);
+    }
+
 private:
     mutable std::mutex mu_;
     std::unordered_map<ConnectionKey, ConnectionStats> stats_;
