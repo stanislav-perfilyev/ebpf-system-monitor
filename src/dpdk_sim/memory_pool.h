@@ -74,7 +74,7 @@ public:
 
     /// Return n objects at once.
     void free_burst(T** objs, std::size_t n) noexcept {
-        free_ring_.enqueue_burst(objs, n);
+        (void)free_ring_.enqueue_burst(objs, n);  // pool_size == ring_size: can't overfill
     }
 
     // --- Stats ---

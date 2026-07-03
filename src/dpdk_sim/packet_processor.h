@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <stdexcept>
 
 namespace dpdk_sim {
 
@@ -59,7 +60,10 @@ class BatchProcessor {
 
 public:
     explicit BatchProcessor(PacketHandler handler)
-        : handler_(std::move(handler)) {}
+        : handler_(std::move(handler))
+    {
+        if (!handler_) throw std::invalid_argument("BatchProcessor: handler must not be null");
+    }
 
     BatchProcessor(const BatchProcessor&)            = delete;
     BatchProcessor& operator=(const BatchProcessor&) = delete;
@@ -85,7 +89,7 @@ public:
         if (n == 0) return 0;
 
         for (std::size_t i = 0; i < n; ++i) {
-            handler_(burst[i]);
+            if (handler_) handler_(burst[i]);
             stats_.bytes_processed += burst[i]->len;
         }
         stats_.pkts_processed += n;

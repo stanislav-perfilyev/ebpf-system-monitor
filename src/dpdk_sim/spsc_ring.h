@@ -64,7 +64,7 @@ public:
     // --- Burst API (DPDK-style) ---
 
     /// Producer: enqueue up to n items. Returns number actually enqueued.
-    std::size_t enqueue_burst(const T* items, std::size_t n) noexcept {
+    [[nodiscard]] std::size_t enqueue_burst(const T* items, std::size_t n) noexcept {
         const std::size_t h    = head_.load(std::memory_order_relaxed);
         const std::size_t t    = tail_.load(std::memory_order_acquire);
         const std::size_t free = Capacity - (h - t);
@@ -76,7 +76,7 @@ public:
     }
 
     /// Consumer: dequeue up to n items. Returns number actually dequeued.
-    std::size_t dequeue_burst(T* items, std::size_t n) noexcept {
+    [[nodiscard]] std::size_t dequeue_burst(T* items, std::size_t n) noexcept {
         const std::size_t t    = tail_.load(std::memory_order_relaxed);
         const std::size_t h    = head_.load(std::memory_order_acquire);
         const std::size_t avail = h - t;

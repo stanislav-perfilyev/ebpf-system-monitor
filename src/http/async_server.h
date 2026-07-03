@@ -113,7 +113,7 @@ class AsyncHttpServer {
             path.empty() || body.empty() ? 404 : 200, ct, body);
 
         // Write (best-effort — non-blocking, partial writes ignored for demo)
-        ::write(fd, response.data(), response.size());
+        (void)::write(fd, response.data(), response.size());
         close_client(fd);
     }
 
@@ -155,7 +155,13 @@ public:
     explicit AsyncHttpServer(uint16_t port, RouteHandler handler)
         : port_(port), handler_(std::move(handler)) {}
 
-    ~AsyncHttpServer() { stop(); }
+    ~AsyncHttpServer() {
+        stop();
+        // Close fds if run() was never called (or threw before opening them)
+        if (listen_fd_ >= 0) { ::close(listen_fd_); listen_fd_ = -1; }
+        if (epoll_fd_  >= 0) { ::close(epoll_fd_);  epoll_fd_  = -1; }
+        if (stop_fd_   >= 0) { ::close(stop_fd_);   stop_fd_   = -1; }
+    }
 
     AsyncHttpServer(const AsyncHttpServer&)            = delete;
     AsyncHttpServer& operator=(const AsyncHttpServer&) = delete;
@@ -215,7 +221,7 @@ public:
     void stop() noexcept {
         if (stop_fd_ >= 0 && running_.load()) {
             uint64_t v = 1;
-            ::write(stop_fd_, &v, sizeof(v));
+            (void)::write(stop_fd_, &v, sizeof(v));
         }
     }
 
