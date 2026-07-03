@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang llvm libbpf-dev libelf-dev \
+            cmake build-essential \
+            libgtest-dev bpftool
+
+      - name: Generate vmlinux.h
+        run: |
+          sudo bpftool btf dump file /sys/kernel/btf/vmlinux format c > bpf/vmlinux.h
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build userspace
+        run: cmake --build build --target ebpf-monitor -j$(nproc)
+
+      - name: Compile BPF programs
+        run: cmake --build build --target bpf_programs -j$(nproc)
+
+      - name: Build tests
+        run: cmake --build build --target test_ebpf_monitor -j$(nproc)
+
+      - name: Run unit tests
+        run: |
+          cd build
+          ctest --output-on-failure -R "StatsReporter|CommonStructs"
