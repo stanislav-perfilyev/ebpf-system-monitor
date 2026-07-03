@@ -1,7 +1,16 @@
 /* include/common.h — общие структуры между BPF (kernel) и userspace (C++) */
 #pragma once
 
+#ifdef __bpf__
+/* В BPF target (clang -target bpf) vmlinux.h даёт u8/u16/u32/u64;
+ * добавляем алиасы uint*_t чтобы общие структуры работали в обоих контекстах */
+typedef unsigned char      uint8_t;
+typedef unsigned short     uint16_t;
+typedef unsigned int       uint32_t;
+typedef unsigned long long uint64_t;
+#else
 #include <stdint.h>
+#endif
 
 /* ── TCP событие (tcp_tracer → userspace) ─────────────────────────────── */
 struct tcp_event {

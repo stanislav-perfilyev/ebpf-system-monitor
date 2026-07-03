@@ -42,6 +42,10 @@ if(BPFTOOL)
         VERBATIM
     )
     add_custom_target(vmlinux_h DEPENDS ${VMLINUX_H})
+    set(BPF_VMLINUX_DEP vmlinux_h)
+else()
+    message(STATUS "bpftool not found — vmlinux.h must be provided at ${CMAKE_BINARY_DIR}/vmlinux.h")
+    set(BPF_VMLINUX_DEP "")
 endif()
 
 set(BPF_OBJECTS "")
@@ -61,7 +65,7 @@ foreach(SRC ${BPF_SRCS})
             -D__TARGET_ARCH_x86
             -c ${CMAKE_SOURCE_DIR}/${SRC}
             -o ${OBJ}
-        DEPENDS ${CMAKE_SOURCE_DIR}/${SRC} vmlinux_h
+        DEPENDS ${CMAKE_SOURCE_DIR}/${SRC} ${BPF_VMLINUX_DEP}
         COMMENT "Compiling BPF: ${SRC}"
         VERBATIM
     )
