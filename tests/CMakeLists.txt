@@ -56,3 +56,22 @@ include(GoogleTest)
 gtest_discover_tests(test_ebpf_monitor)
 gtest_discover_tests(test_dpdk_sim)
 gtest_discover_tests(test_http)
+
+# ── MT demo: ThreadPool + RequestStats ────────────────────────────────────────
+add_executable(test_thread_pool
+    test_thread_pool.cpp
+)
+
+target_include_directories(test_thread_pool PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/http
+)
+
+target_link_libraries(test_thread_pool PRIVATE
+    GTest::gtest
+    GTest::gtest_main
+    pthread
+)
+
+gtest_discover_tests(test_thread_pool)
