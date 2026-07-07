@@ -69,7 +69,7 @@ public:
     BatchProcessor& operator=(const BatchProcessor&) = delete;
 
     /// Producer-side: send a packet (zero-copy — caller gets ptr from alloc())
-    bool send(Packet* pkt) noexcept {
+    [[nodiscard]] bool send(Packet* pkt) noexcept {
         if (!ring_.enqueue(pkt)) {
             ++stats_.pkts_dropped;
             pool_.free(pkt);   // return to pool on drop
@@ -83,7 +83,7 @@ public:
 
     /// Consumer-side: process one burst (up to BURST_SIZE packets).
     /// Returns number of packets processed.
-    std::size_t process_burst() noexcept {
+    [[nodiscard]] std::size_t process_burst() noexcept {
         std::array<Packet*, BURST_SIZE> burst{};
         const std::size_t n = ring_.dequeue_burst(burst.data(), BURST_SIZE);
         if (n == 0) return 0;
@@ -101,7 +101,7 @@ public:
 
     const ProcessorStats&  stats()      const noexcept { return stats_; }
     const MemoryPool<Packet, PoolSize>& pool() const noexcept { return pool_; }
-    bool ring_empty() const noexcept { return ring_.empty(); }
+    [[nodiscard]] bool ring_empty() const noexcept { return ring_.empty(); }
 };
 
 } // namespace dpdk_sim

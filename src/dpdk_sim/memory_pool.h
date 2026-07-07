@@ -61,7 +61,7 @@ public:
     // --- Burst variants (zero-copy batch allocation) ---
 
     /// Allocate up to n objects. Returns count actually allocated.
-    std::size_t alloc_burst(T** objs, std::size_t n) noexcept {
+    [[nodiscard]] std::size_t alloc_burst(T** objs, std::size_t n) noexcept {
         std::size_t got = 0;
         while (got < n) {
             T* obj = nullptr;

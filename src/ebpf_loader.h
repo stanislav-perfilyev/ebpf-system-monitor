@@ -108,7 +108,7 @@ public:
     BpfRingBuffer& operator=(const BpfRingBuffer&) = delete;
 
     /* Блокирующий poll, timeout_ms = -1 → ждать вечно */
-    int poll(int timeout_ms = 100) const
+    [[nodiscard]] int poll(int timeout_ms = 100) const
     {
         return ring_buffer__poll(rb_, timeout_ms);
     }
