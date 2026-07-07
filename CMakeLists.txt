@@ -107,4 +107,4 @@ endif()
 
 # ── Install ───────────────────────────────────────────────────────────────
 install(TARGETS ebpf-monitor RUNTIME DESTINATION bin)
-install(FILES ${BPF_OBJECTS} DESTINATION lib/ebpf-m
+install(FILES ${BPF_OBJECTS} DESTINATION lib/ebpf-monitor)

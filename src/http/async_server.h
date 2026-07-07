@@ -123,7 +123,7 @@ class AsyncHttpServer {
         ::close(fd);
     }
 
-    static std::string parse_path(const std::string& req) {
+    [[nodiscard]] static std::string parse_path(const std::string& req) {
         // "GET /path HTTP/1.1\r\n..."
         const auto sp1 = req.find(' ');
         if (sp1 == std::string::npos) return "";
@@ -132,7 +132,7 @@ class AsyncHttpServer {
         return req.substr(sp1 + 1, sp2 - sp1 - 1);
     }
 
-    static std::string build_response(int status,
+    [[nodiscard]] static std::string build_response(int status,
                                       std::string_view content_type,
                                       std::string_view body) {
         const std::string_view reason = (status == 200) ? "OK" : "Not Found";

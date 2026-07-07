@@ -143,14 +143,14 @@ private:
     mutable std::mutex mu_;
     std::unordered_map<ConnectionKey, ConnectionStats> stats_;
 
-    static std::string ip_port(uint32_t ip, uint16_t port)
+    [[nodiscard]] static std::string ip_port(uint32_t ip, uint16_t port)
     {
         char buf[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &ip, buf, sizeof(buf));
         return std::string(buf) + ":" + std::to_string(port);
     }
 
-    static std::string human_bytes(uint64_t b)
+    [[nodiscard]] static std::string human_bytes(uint64_t b)
     {
         if (b < 1024)       return std::to_string(b) + "B";
         if (b < 1024*1024)  return std::to_string(b/1024) + "K";

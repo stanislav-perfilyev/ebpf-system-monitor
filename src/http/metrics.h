@@ -17,7 +17,7 @@ namespace http {
 class PrometheusMetrics {
 public:
     /// Format StatsReporter data as Prometheus exposition text.
-    static std::string from_reporter(const ebpf::StatsReporter& reporter) {
+    [[nodiscard]] static std::string from_reporter(const ebpf::StatsReporter& reporter) {
         std::ostringstream out;
         const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
@@ -66,7 +66,7 @@ public:
 
     /// Format DPDK-sim BatchProcessor stats.
     template <std::size_t R, std::size_t P>
-    static std::string from_processor(const dpdk_sim::BatchProcessor<R, P>& proc) {
+    [[nodiscard]] static std::string from_processor(const dpdk_sim::BatchProcessor<R, P>& proc) {
         std::ostringstream out;
         const auto& s = proc.stats();
         const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
