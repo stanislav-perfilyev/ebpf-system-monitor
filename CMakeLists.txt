@@ -7,7 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ── Compiler flags ────────────────────────────────────────────────────────
 add_compile_options(
-    -Wall -Wextra -Wpedantic -Wconversion
+    -Wall -Wextra -Wpedantic -Wconversion -Werror
     -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual
     $<$<CONFIG:Release>:-O2>
     $<$<CONFIG:Debug>:-g>
@@ -107,4 +107,4 @@ endif()
 
 # ── Install ───────────────────────────────────────────────────────────────
 install(TARGETS ebpf-monitor RUNTIME DESTINATION bin)
-install(FILES ${BPF_OBJECTS} DESTINATION lib/ebpf-monitor)
+install(FILES ${BPF_OBJECTS} DESTINATION lib/ebpf-m
