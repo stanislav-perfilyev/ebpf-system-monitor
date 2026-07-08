@@ -113,7 +113,7 @@ class AsyncHttpServer {
             path.empty() || body.empty() ? 404 : 200, ct, body);
 
         // Write (best-effort — non-blocking, partial writes ignored for demo)
-        (void)::write(fd, response.data(), response.size());
+        [[maybe_unused]] ssize_t _wr = ::write(fd, response.data(), response.size());
         close_client(fd);
     }
 
@@ -221,7 +221,7 @@ public:
     void stop() noexcept {
         if (stop_fd_ >= 0 && running_.load()) {
             uint64_t v = 1;
-            (void)::write(stop_fd_, &v, sizeof(v));
+            [[maybe_unused]] ssize_t _wr = ::write(stop_fd_, &v, sizeof(v));
         }
     }
 
