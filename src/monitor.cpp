@@ -199,8 +199,8 @@ int main(int argc, char *argv[])
         auto last_print = std::chrono::steady_clock::now();
 
         while (!g_stop) {
-            tcp_rb.poll(100);
-            audit_rb.poll(10);
+            (void)tcp_rb.poll(100);
+            (void)audit_rb.poll(10);
 
             auto now = std::chrono::steady_clock::now();
             if (!g_json &&

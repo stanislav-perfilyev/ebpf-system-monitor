@@ -81,28 +81,32 @@ endforeach()
 
 add_custom_target(bpf_programs DEPENDS ${BPF_OBJECTS})  # не ALL — требует BPF toolchain
 
-# ── Основной исполняемый файл ─────────────────────────────────────────────
-add_executable(ebpf-monitor
-    src/monitor.cpp
-)
+# ── Основной исполняемый файл (требует libbpf) ───────────────────────────
+if(LIBBPF_LIB AND LIBELF_LIB AND LIBZ_LIB)
+    add_executable(ebpf-monitor
+        src/monitor.cpp
+    )
 
-target_include_directories(ebpf-monitor PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/src/dpdk_sim
-    ${CMAKE_SOURCE_DIR}/src/http
-    ${LIBBPF_INCLUDE}
-)
+    target_include_directories(ebpf-monitor PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/src/dpdk_sim
+        ${CMAKE_SOURCE_DIR}/src/http
+        ${LIBBPF_INCLUDE}
+    )
 
-target_link_libraries(ebpf-monitor PRIVATE
-    ${LIBBPF_LIB}
-    ${LIBELF_LIB}
-    ${LIBZ_LIB}
-    pthread
-)
+    target_link_libraries(ebpf-monitor PRIVATE
+        ${LIBBPF_LIB}
+        ${LIBELF_LIB}
+        ${LIBZ_LIB}
+        pthread
+    )
 
-if(BPFTOOL)
-    add_dependencies(ebpf-monitor bpf_programs)
+    if(BPFTOOL)
+        add_dependencies(ebpf-monitor bpf_programs)
+    endif()
+else()
+    message(STATUS "libbpf/libelf/libz не найдены — ebpf-monitor пропущен (тесты доступны)")
 endif()
 
 # ── Тесты ────────────────────────────────────────────────────────────────
