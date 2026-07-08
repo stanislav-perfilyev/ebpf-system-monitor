@@ -48,6 +48,7 @@ struct net_stats_key {
     uint8_t  _pad[3];
 };
 
+/// Per-interface network statistics: packet and byte counters (BPF map value).
 struct net_stats_val {
     uint64_t packets;
     uint64_t bytes;
