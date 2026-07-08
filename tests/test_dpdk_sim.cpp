@@ -178,9 +178,9 @@ TEST(BatchProcessor, StatsAccumulate) {
         Packet* pkt = proc.alloc_packet();
         ASSERT_NE(pkt, nullptr);
         pkt->len = 200;
-        proc.send(pkt);
+        (void)proc.send(pkt);
     }
-    proc.process_burst();
+    (void)proc.process_burst();
 
     EXPECT_EQ(proc.stats().pkts_processed, 5u);
     EXPECT_EQ(proc.stats().bytes_processed, 1000u);
@@ -194,7 +194,7 @@ TEST(BatchProcessor, PoolReturnedAfterProcess) {
     Packet* pkt = proc.alloc_packet();
     ASSERT_NE(pkt, nullptr);
     pkt->len = 1;
-    proc.send(pkt);
+    (void)proc.send(pkt);
     EXPECT_LT(proc.pool().available(), initial);
 
     (void)proc.process_burst();

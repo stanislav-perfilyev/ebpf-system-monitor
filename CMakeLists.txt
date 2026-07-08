@@ -23,14 +23,14 @@ add_compile_options(
 add_link_options($<$<CONFIG:Debug>:-fsanitize=address,undefined>)
 
 # ── Найти libbpf ─────────────────────────────────────────────────────────
-find_library(LIBBPF_LIB bpf REQUIRED)
-find_path(LIBBPF_INCLUDE bpf/libbpf.h REQUIRED)
+find_library(LIBBPF_LIB bpf)
+find_path(LIBBPF_INCLUDE bpf/libbpf.h)
 
-find_library(LIBELF_LIB elf REQUIRED)
-find_library(LIBZ_LIB z REQUIRED)
+find_library(LIBELF_LIB elf)
+find_library(LIBZ_LIB z)
 
 # ── BPF объекты (компилируются clang -target bpf) ────────────────────────
-find_program(CLANG clang REQUIRED)
+find_program(CLANG clang)
 find_program(BPFTOOL bpftool)
 
 set(BPF_SRCS
@@ -55,31 +55,34 @@ else()
     set(BPF_VMLINUX_DEP "")
 endif()
 
-set(BPF_OBJECTS "")
-foreach(SRC ${BPF_SRCS})
-    get_filename_component(NAME ${SRC} NAME_WE)
-    set(OBJ "${CMAKE_BINARY_DIR}/bpf/${NAME}.bpf.o")
-    add_custom_command(
-        OUTPUT  ${OBJ}
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bpf"
-        COMMAND ${CLANG}
-            -target bpf
-            -O2 -g
-            -I${CMAKE_SOURCE_DIR}/include
-            -I${CMAKE_SOURCE_DIR}/bpf
-            -I${CMAKE_BINARY_DIR}          # vmlinux.h
-            -I${LIBBPF_INCLUDE}
-            -D__TARGET_ARCH_x86
-            -c ${CMAKE_SOURCE_DIR}/${SRC}
-            -o ${OBJ}
-        DEPENDS ${CMAKE_SOURCE_DIR}/${SRC} ${BPF_VMLINUX_DEP}
-        COMMENT "Compiling BPF: ${SRC}"
-        VERBATIM
-    )
-    list(APPEND BPF_OBJECTS ${OBJ})
-endforeach()
-
-add_custom_target(bpf_programs DEPENDS ${BPF_OBJECTS})  # не ALL — требует BPF toolchain
+if(CLANG)
+    set(BPF_OBJECTS "")
+    foreach(SRC ${BPF_SRCS})
+        get_filename_component(NAME ${SRC} NAME_WE)
+        set(OBJ "${CMAKE_BINARY_DIR}/bpf/${NAME}.bpf.o")
+        add_custom_command(
+            OUTPUT  ${OBJ}
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bpf"
+            COMMAND ${CLANG}
+                -target bpf
+                -O2 -g
+                -I${CMAKE_SOURCE_DIR}/include
+                -I${CMAKE_SOURCE_DIR}/bpf
+                -I${CMAKE_BINARY_DIR}          # vmlinux.h
+                -I${LIBBPF_INCLUDE}
+                -D__TARGET_ARCH_x86
+                -c ${CMAKE_SOURCE_DIR}/${SRC}
+                -o ${OBJ}
+            DEPENDS ${CMAKE_SOURCE_DIR}/${SRC} ${BPF_VMLINUX_DEP}
+            COMMENT "Compiling BPF: ${SRC}"
+            VERBATIM
+        )
+        list(APPEND BPF_OBJECTS ${OBJ})
+    endforeach()
+    add_custom_target(bpf_programs DEPENDS ${BPF_OBJECTS})  # не ALL — требует BPF toolchain
+else()
+    message(STATUS "clang not found — bpf_programs target недоступен (только тесты)")
+endif()
 
 # ── Основной исполняемый файл (требует libbpf) ───────────────────────────
 if(LIBBPF_LIB AND LIBELF_LIB AND LIBZ_LIB)
@@ -119,5 +122,9 @@ if(GTest_FOUND OR TARGET GTest::gtest)
 endif()
 
 # ── Install ───────────────────────────────────────────────────────────────
-install(TARGETS ebpf-monitor RUNTIME DESTINATION bin)
-install(FILES ${BPF_OBJECTS} DESTINATION lib/ebpf-monitor)
+if(LIBBPF_LIB AND LIBELF_LIB AND LIBZ_LIB)
+    install(TARGETS ebpf-monitor RUNTIME DESTINATION bin)
+endif()
+if(CLANG AND BPF_OBJECTS)
+    install(FILES ${BPF_OBJECTS} DESTINATION lib/ebpf-monitor)
+endif()
