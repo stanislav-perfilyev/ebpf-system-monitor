@@ -79,7 +79,7 @@ foreach(SRC ${BPF_SRCS})
     list(APPEND BPF_OBJECTS ${OBJ})
 endforeach()
 
-add_custom_target(bpf_programs ALL DEPENDS ${BPF_OBJECTS})
+add_custom_target(bpf_programs DEPENDS ${BPF_OBJECTS})  # не ALL — требует BPF toolchain
 
 # ── Основной исполняемый файл ─────────────────────────────────────────────
 add_executable(ebpf-monitor
@@ -101,7 +101,9 @@ target_link_libraries(ebpf-monitor PRIVATE
     pthread
 )
 
-add_dependencies(ebpf-monitor bpf_programs)
+if(BPFTOOL)
+    add_dependencies(ebpf-monitor bpf_programs)
+endif()
 
 # ── Тесты ────────────────────────────────────────────────────────────────
 include(CTest)

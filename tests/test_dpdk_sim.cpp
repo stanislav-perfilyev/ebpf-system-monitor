@@ -197,7 +197,7 @@ TEST(BatchProcessor, PoolReturnedAfterProcess) {
     proc.send(pkt);
     EXPECT_LT(proc.pool().available(), initial);
 
-    proc.process_burst();
+    (void)proc.process_burst();
     // After processing, pool returns to initial
     EXPECT_EQ(proc.pool().available(), initial);
 }
