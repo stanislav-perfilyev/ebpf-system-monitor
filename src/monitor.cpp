@@ -18,6 +18,7 @@
 #include <arpa/inet.h>
 #include <csignal>
 #include <cstdio>
+#include <cinttypes>
 #include <cstring>
 #include <getopt.h>
 #include <iostream>
@@ -46,9 +47,9 @@ static int handle_tcp_event(void * /*ctx*/, void *data, size_t /*size*/)
         inet_ntop(AF_INET, &ev->src_ip, src, sizeof(src));
         inet_ntop(AF_INET, &ev->dst_ip, dst, sizeof(dst));
         std::printf(
-            "{\"ts\":%llu,\"pid\":%u,\"comm\":\"%s\","
+            "{\"ts\":%" PRIu64 ",\"pid\":%u,\"comm\":\"%s\","
             "\"src\":\"%s:%u\",\"dst\":\"%s:%u\","
-            "\"action\":%u,\"tx\":%llu,\"rx\":%llu}\n",
+            "\"action\":%u,\"tx\":%" PRIu64 ",\"rx\":%" PRIu64 "}\n",
             ev->timestamp_ns, ev->pid, ev->comm,
             src, ev->src_port, dst, ev->dst_port,
             ev->action, ev->bytes_tx, ev->bytes_rx);
@@ -61,7 +62,7 @@ static int handle_syscall_event(void * /*ctx*/, void *data, size_t /*size*/)
 {
     const auto *ev = static_cast<const syscall_event *>(data);
     std::fprintf(stderr,
-        "[AUDIT] ts=%llu pid=%u uid=%u comm=%s syscall=%ld\n",
+        "[AUDIT] ts=%" PRIu64 " pid=%u uid=%u comm=%s syscall=%ld\n",
         ev->timestamp_ns, ev->pid, ev->uid, ev->comm, ev->syscall_nr);
     return 0;
 }
