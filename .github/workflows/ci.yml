@@ -18,14 +18,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             clang llvm libbpf-dev libelf-dev \
-            cmake build-essential libgtest-dev \
-            linux-tools-common linux-tools-generic || true
-          # Fallback: pre-built bpftool from libbpf project
-          if ! command -v bpftool &>/dev/null; then
-            curl -fsSL https://github.com/libbpf/bpftool/releases/download/v7.4.0/bpftool-v7.4.0-amd64.tar.gz \
-              | tar -xz bpftool
-            sudo install -m 755 bpftool /usr/local/bin/bpftool
-          fi
+            cmake build-essential libgtest-dev
+          # Always use pre-built kernel-independent bpftool
+          curl -fsSL https://github.com/libbpf/bpftool/releases/download/v7.4.0/bpftool-v7.4.0-amd64.tar.gz \
+            | tar -xz bpftool
+          sudo install -m 755 bpftool /usr/local/bin/bpftool
           bpftool version
 
       - name: Generate vmlinux.h
