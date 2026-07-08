@@ -13,6 +13,7 @@ typedef unsigned long long uint64_t;
 #endif
 
 /* ── TCP событие (tcp_tracer → userspace) ─────────────────────────────── */
+/// TCP connection event: passed from BPF ring buffer to userspace on each TCP activity.
 struct tcp_event {
     uint64_t timestamp_ns;   /* ktime_get_ns() */
     uint32_t pid;
@@ -30,6 +31,7 @@ struct tcp_event {
 };
 
 /* ── Syscall событие (syscall_audit → userspace) ──────────────────────── */
+/// Syscall audit event: captures system call activity (pid, uid, comm, syscall nr).
 struct syscall_event {
     uint64_t timestamp_ns;
     uint32_t pid;
@@ -40,6 +42,7 @@ struct syscall_event {
 };
 
 /* ── Сетевая статистика (net_stats map) ───────────────────────────────── */
+/// Key for per-interface network statistics map (BPF map → userspace aggregation).
 struct net_stats_key {
     uint8_t  proto;          /* IPPROTO_TCP=6, IPPROTO_UDP=17, etc */
     uint8_t  _pad[3];

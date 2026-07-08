@@ -113,13 +113,21 @@ static std::string http_route(std::string_view path,
     return "";  // → 404
 }
 
-/* ── main ─────────────────────────────────────────────────────────────── */
-int main(int argc, char *argv[])
-{
+/* ── Константы ──────────────────────────────────────────────────────────── */
+static constexpr int RING_BUFFER_POLL_TCP_MS   = 100;  ///< poll timeout TCP ring buffer (ms)
+static constexpr int RING_BUFFER_POLL_AUDIT_MS = 10;   ///< poll timeout audit ring buffer (ms)
+static constexpr int PRINT_INTERVAL_SEC        = 5;    ///< интервал вывода статистики (сек)
+
+/* ── Конфигурация запуска ────────────────────────────────────────────── */
+struct Config {
     uint32_t filter_pid  = 0;
     uint32_t filter_port = 0;
-    uint16_t http_port   = 9090;  // Prometheus default
+    uint16_t http_port   = 9090;  ///< Prometheus default port
+};
 
+/// Разбирает аргументы командной строки. Возвращает -1 если нужно завершить.
+static int parse_args(int argc, char *argv[], Config& cfg)
+{
     static const option long_opts[] = {
         {"filter-pid",  required_argument, nullptr, 'p'},
         {"filter-port", required_argument, nullptr, 'P'},
@@ -128,13 +136,12 @@ int main(int argc, char *argv[])
         {"help",        no_argument,       nullptr, 'h'},
         {nullptr, 0, nullptr, 0}
     };
-
     int opt;
     while ((opt = getopt_long(argc, argv, "p:P:o:jh", long_opts, nullptr)) != -1) {
         switch (opt) {
-        case 'p': filter_pid  = static_cast<uint32_t>(std::stoul(optarg)); break;
-        case 'P': filter_port = static_cast<uint32_t>(std::stoul(optarg)); break;
-        case 'o': http_port   = static_cast<uint16_t>(std::stoul(optarg)); break;
+        case 'p': cfg.filter_pid  = static_cast<uint32_t>(std::stoul(optarg)); break;
+        case 'P': cfg.filter_port = static_cast<uint32_t>(std::stoul(optarg)); break;
+        case 'o': cfg.http_port   = static_cast<uint16_t>(std::stoul(optarg)); break;
         case 'j': g_json = true; break;
         case 'h':
             std::cout << "Usage: sudo ebpf-monitor [OPTIONS]\n"
@@ -142,81 +149,81 @@ int main(int argc, char *argv[])
                       << "  --filter-port N  trace only port N\n"
                       << "  --port N         HTTP metrics port (default: 9090)\n"
                       << "  --json           emit JSON lines to stdout\n";
-            return 0;
-        default:
-            return 1;
+            return -1;
+        default: return 1;
+        }
+    }
+    return 0;
+}
+
+/// Загружает BPF программы, запускает HTTP сервер и main event loop.
+static void run_monitor(const Config& cfg)
+{
+    ebpf::BpfObject tcp_obj("bpf/tcp_tracer.bpf.o");
+    ebpf::BpfObject audit_obj("bpf/syscall_audit.bpf.o");
+
+    if (cfg.filter_pid || cfg.filter_port) {
+        bpf_map *fmap = tcp_obj.find_map("filters");
+        if (cfg.filter_pid)  set_filter(fmap, 0, cfg.filter_pid);
+        if (cfg.filter_port) set_filter(fmap, 1, cfg.filter_port);
+    }
+
+    ebpf::BpfLink tcp_connect_link(tcp_obj.attach_kprobe("tcp_connect",  "trace_tcp_connect"));
+    ebpf::BpfLink tcp_close_link  (tcp_obj.attach_kprobe("tcp_close",    "trace_tcp_close"));
+    ebpf::BpfLink audit_link      (audit_obj.attach_tracepoint("raw_syscalls", "sys_enter", "audit_syscall"));
+
+    ebpf::StatsReporter reporter;
+    g_reporter = &reporter;
+
+    http::AsyncHttpServer http_srv(cfg.http_port,
+        [&reporter](std::string_view path) { return http_route(path, reporter); });
+    http_srv.start();
+    std::jthread http_thread([&http_srv]{ http_srv.run(); });
+
+    std::cout << "eBPF monitor running. HTTP metrics at http://localhost:"
+              << cfg.http_port << "/metrics\n"
+              << "Endpoints: /metrics  /connections  /health\n"
+              << "Press Ctrl+C to stop.\n";
+    if (cfg.filter_pid)  std::cout << "  Filtering PID:  " << cfg.filter_pid  << "\n";
+    if (cfg.filter_port) std::cout << "  Filtering Port: " << cfg.filter_port << "\n";
+
+    ebpf::BpfRingBuffer tcp_rb  (tcp_obj.find_map("tcp_events"),
+                                  handle_tcp_event, nullptr);
+    ebpf::BpfRingBuffer audit_rb(audit_obj.find_map("syscall_events"),
+                                  handle_syscall_event, nullptr);
+
+    auto last_print = std::chrono::steady_clock::now();
+    while (!g_stop) {
+        (void)tcp_rb.poll(RING_BUFFER_POLL_TCP_MS);
+        (void)audit_rb.poll(RING_BUFFER_POLL_AUDIT_MS);
+        auto now = std::chrono::steady_clock::now();
+        if (!g_json &&
+            std::chrono::duration_cast<std::chrono::seconds>(now - last_print).count()
+                >= PRINT_INTERVAL_SEC)
+        {
+            reporter.print_top(10);
+            last_print = now;
         }
     }
 
-    libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+    std::cout << "\nShutting down.\n";
+    http_srv.stop();
+    g_reporter = nullptr;
+}
 
+/* ── main ─────────────────────────────────────────────────────────────── */
+int main(int argc, char *argv[])
+{
+    Config cfg;
+    if (int rc = parse_args(argc, argv, cfg); rc != 0)
+        return rc < 0 ? 0 : rc;
+
+    libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
     std::signal(SIGINT,  on_signal);
     std::signal(SIGTERM, on_signal);
 
     try {
-        /* ── Загрузить BPF объекты ─────────────────────────────────── */
-        ebpf::BpfObject tcp_obj("bpf/tcp_tracer.bpf.o");
-        ebpf::BpfObject audit_obj("bpf/syscall_audit.bpf.o");
-
-        if (filter_pid || filter_port) {
-            bpf_map *fmap = tcp_obj.find_map("filters");
-            if (filter_pid)  set_filter(fmap, 0, filter_pid);
-            if (filter_port) set_filter(fmap, 1, filter_port);
-        }
-
-        ebpf::BpfLink tcp_connect_link(
-            tcp_obj.attach_kprobe("tcp_connect", "trace_tcp_connect"));
-        ebpf::BpfLink tcp_close_link(
-            tcp_obj.attach_kprobe("tcp_close", "trace_tcp_close"));
-        ebpf::BpfLink audit_link(
-            audit_obj.attach_tracepoint("raw_syscalls", "sys_enter",
-                                         "audit_syscall"));
-
-        /* ── HTTP сервер в отдельном jthread ──────────────────────── */
-        ebpf::StatsReporter reporter;
-        g_reporter = &reporter;
-
-        http::AsyncHttpServer http_srv(http_port,
-            [&reporter](std::string_view path) {
-                return http_route(path, reporter);
-            });
-        http_srv.start();
-        std::jthread http_thread([&http_srv]{ http_srv.run(); });
-
-        std::cout << "eBPF monitor running. HTTP metrics at http://localhost:"
-                  << http_port << "/metrics\n"
-                  << "Endpoints: /metrics  /connections  /health\n"
-                  << "Press Ctrl+C to stop.\n";
-        if (filter_pid)  std::cout << "  Filtering PID:  " << filter_pid  << "\n";
-        if (filter_port) std::cout << "  Filtering Port: " << filter_port << "\n";
-
-        /* ── Ring buffers ──────────────────────────────────────────── */
-        ebpf::BpfRingBuffer tcp_rb(tcp_obj.find_map("tcp_events"),
-                                    handle_tcp_event, nullptr);
-        ebpf::BpfRingBuffer audit_rb(audit_obj.find_map("syscall_events"),
-                                      handle_syscall_event, nullptr);
-
-        /* ── Главный цикл ──────────────────────────────────────────── */
-        auto last_print = std::chrono::steady_clock::now();
-
-        while (!g_stop) {
-            (void)tcp_rb.poll(100);
-            (void)audit_rb.poll(10);
-
-            auto now = std::chrono::steady_clock::now();
-            if (!g_json &&
-                std::chrono::duration_cast<std::chrono::seconds>(
-                    now - last_print).count() >= 5)
-            {
-                reporter.print_top(10);
-                last_print = now;
-            }
-        }
-
-        std::cout << "\nShutting down.\n";
-        http_srv.stop();
-        g_reporter = nullptr;
-
+        run_monitor(cfg);
     } catch (const ebpf::Error& e) {
         std::cerr << "eBPF error: " << e.what() << "\n";
         std::cerr << "Tip: run as root (sudo) and ensure BTF is available\n";
@@ -225,6 +232,5 @@ int main(int argc, char *argv[])
         std::cerr << "Error: " << e.what() << "\n";
         return 1;
     }
-
     return 0;
 }
