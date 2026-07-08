@@ -51,6 +51,7 @@ jobs:
           cmake --build build --target test_ebpf_monitor -j$(nproc)
           cmake --build build --target test_dpdk_sim     -j$(nproc)
           cmake --build build --target test_http         -j$(nproc)
+          cmake --build build --target test_thread_pool  -j$(nproc)
 
       - name: Run unit tests
         run: |
