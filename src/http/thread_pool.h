@@ -8,7 +8,8 @@
 // Design:
 //   - N std::jthread workers consume tasks from a shared deque.
 //   - std::condition_variable wakes workers on new tasks or shutdown.
-//   - RAII: destructor sets stop flag, notifies all, jthreads auto-join.
+//   - RAII: destructor sets stop flag, notifies all, joins the workers once
+//     they have drained the queue (every submitted task still runs).
 //   - submit() is callable from any thread; returns std::future<T>.
 //
 // Thread-safety model:
@@ -45,13 +46,17 @@ public:
     }
 
     ~ThreadPool() {
-        // Stop all workers: set flag, wake them up, jthreads auto-join
+        // Stop all workers: set flag, wake them up; they drain the queue first
         {
             std::unique_lock lock(m_mtx);
             m_stop = true;
         }
         m_cv.notify_all();
-        // std::jthread destructor requests stop and joins
+        // Join here rather than in the implicit member teardown: members are
+        // destroyed in reverse declaration order, so m_stop, m_pending and
+        // m_completed (declared after m_workers) would already be dead while
+        // workers still finish queued tasks and touch them.
+        m_workers.clear();
     }
 
     ThreadPool(const ThreadPool&)            = delete;

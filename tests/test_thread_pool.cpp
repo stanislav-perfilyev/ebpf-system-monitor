@@ -105,12 +105,35 @@ TEST(ThreadPool, Completed_CountsThrowingTask) {
     EXPECT_EQ(pool.completed(), 1u);
 }
 
-TEST(ThreadPool, Submit_AfterShutdown_Throws) {
-    // Create pool in a scope so it shuts down
-    std::unique_ptr<ThreadPool> pool = std::make_unique<ThreadPool>(2);
-    pool.reset();  // destroys → stop flag set + join
-    // Nothing to test post-destruction — just verifying no crash
-    SUCCEED();
+// Destroying the pool with work still queued must not drop it: the destructor
+// returns only after every submitted task has run, so each future already
+// holds its value (a dropped task would leave a broken_promise instead).
+TEST(ThreadPool, Destructor_DrainsQueuedTasks) {
+    constexpr std::size_t kWorkers = 2;
+    constexpr std::size_t kTasks   = 8;
+    std::promise<void> gate;
+    const std::shared_future<void> opened = gate.get_future().share();
+    std::vector<std::future<std::size_t>> futs;
+    futs.reserve(kTasks);
+    {
+        ThreadPool pool(kWorkers);
+        for (std::size_t i = 0; i < kTasks; ++i)
+            futs.emplace_back(pool.submit([opened, i]() {
+                opened.wait();
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                return i;
+            }));
+        // Workers hold at most kWorkers tasks behind the gate, the rest are
+        // queued. EXPECT, not ASSERT: the gate must open or ~ThreadPool hangs.
+        EXPECT_GE(pool.pending(), kTasks - kWorkers);
+        gate.set_value();
+    }  // ~ThreadPool starts while slow tasks are still queued
+
+    for (std::size_t i = 0; i < kTasks; ++i) {
+        ASSERT_EQ(futs[i].wait_for(std::chrono::seconds(0)), std::future_status::ready)
+            << "task " << i;
+        EXPECT_EQ(futs[i].get(), i);
+    }
 }
 
 TEST(ThreadPool, SubmitWithArgs) {
