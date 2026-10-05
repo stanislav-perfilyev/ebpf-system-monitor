@@ -15,6 +15,7 @@
 //   submit()            → unique_lock on m_mtx (task push + notify_one)
 //   worker drain loop  → unique_lock on m_mtx (task pop)
 //   size()             → std::atomic (wait-free)
+//   completed()        → std::atomic, bumped before the task's future is ready
 //
 #include <atomic>
 #include <condition_variable>
@@ -64,8 +65,10 @@ public:
         using R = std::invoke_result_t<F, Args...>;
 
         auto task = std::make_shared<std::packaged_task<R()>>(
-            [func = std::forward<F>(f),
+            [this,
+             func = std::forward<F>(f),
              ...bound = std::forward<Args>(args)]() mutable {
+                CompletionGuard done{m_completed};
                 return func(std::forward<Args>(bound)...);
             });
 
@@ -90,11 +93,21 @@ public:
     }
 
     /// Total tasks completed since construction (wait-free).
+    /// A task is counted before its future becomes ready, so once get() or
+    /// wait() on that future returns, completed() already includes it.
     [[nodiscard]] uint64_t completed() const noexcept {
         return m_completed.load(std::memory_order_relaxed);
     }
 
 private:
+    // Bumps the counter when the task body returns or throws — that is, before
+    // packaged_task stores the result and makes the future ready. The bump is
+    // sequenced before that release, so get() on the future happens-after it.
+    struct CompletionGuard {
+        std::atomic<uint64_t>& counter;
+        ~CompletionGuard() { counter.fetch_add(1, std::memory_order_relaxed); }
+    };
+
     void worker_loop([[maybe_unused]] const std::stop_token& st) {
         while (true) {
             std::function<void()> task;
@@ -107,7 +120,6 @@ private:
                 --m_pending;
             }
             task();
-            m_completed.fetch_add(1, std::memory_order_relaxed);
         }
     }
 

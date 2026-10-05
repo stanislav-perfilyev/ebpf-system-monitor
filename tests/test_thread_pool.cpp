@@ -10,7 +10,9 @@
 
 #include <atomic>
 #include <chrono>
+#include <future>
 #include <numeric>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -72,6 +74,35 @@ TEST(ThreadPool, Completed_Counter_Accurate) {
         futs.emplace_back(pool.submit([]() {}));
     for (auto& f : futs) f.get();
     EXPECT_EQ(pool.completed(), static_cast<uint64_t>(N));
+}
+
+// A task must be counted in completed() before its future becomes ready.
+// The worker used to bump the counter after packaged_task had already made the
+// future ready, so a caller holding every result could still read a stale
+// count (seen on CI: 999 of 1000). Spinning on wait_for(0s) instead of blocking
+// in get() runs the check the moment the future turns ready — right where the
+// old ordering left a window.
+TEST(ThreadPool, Completed_VisibleOnceFutureReady_Stress) {
+    constexpr int kRounds = 200;
+    constexpr int kTasks  = 100;
+    for (int round = 0; round < kRounds; ++round) {
+        ThreadPool pool(4);
+        // One task in flight at a time, so exactly i + 1 tasks are done.
+        for (int i = 0; i < kTasks; ++i) {
+            auto fut = pool.submit([]() {});
+            while (fut.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            }
+            ASSERT_EQ(pool.completed(), static_cast<uint64_t>(i + 1))
+                << "round " << round << ", task " << i;
+        }
+    }
+}
+
+TEST(ThreadPool, Completed_CountsThrowingTask) {
+    ThreadPool pool(1);
+    auto fut = pool.submit([]() { throw std::runtime_error("handler failed"); });
+    EXPECT_THROW(fut.get(), std::runtime_error);
+    EXPECT_EQ(pool.completed(), 1u);
 }
 
 TEST(ThreadPool, Submit_AfterShutdown_Throws) {
